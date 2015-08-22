@@ -6,7 +6,11 @@
 
 #include <unprotboot9_sdmmc.h>
 
+#ifndef USE_RAWDEVICE
 #include "ff.h"
+#else
+typedef unsigned short TCHAR;
+#endif
 
 #ifndef ARM9BIN_FILEPATH
 #define ARM9BIN_FILEPATH L"/3dshax_arm9.bin"
@@ -19,6 +23,26 @@
 #ifdef FIRMLOAD_DISABLE
 #ifdef BINLOAD_DISABLE
 #error FIRMLOAD_DISABLE and BINLOAD_DISABLE must not be used at the same time.
+#endif
+#endif
+
+#ifdef USE_RAWDEVICE
+#ifndef BINLOAD_DISABLE
+#error "BINLOAD_DISABLE must be used when USE_RAWDEVICE is enabled."
+#endif
+
+#ifndef RAWDEVICE_STARTSECTOR
+#error "RAWDEVICE_STARTSECTOR must be specified when USE_RAWDEVICE is enabled."
+#endif
+
+#ifndef RAWDEVICE_NUMSECTORS
+#error "RAWDEVICE_NUMSECTORS must be specified when USE_RAWDEVICE is enabled."
+#endif
+#endif
+
+#ifdef USEDEVICE_NAND
+#ifndef USE_RAWDEVICE
+#error "USEDEVICE_NAND can only be used when USE_RAWDEVICE is enabled."
 #endif
 #endif
 
@@ -36,7 +60,11 @@ typedef struct {
 	u32 hash[0x20>>2];
 } firm_sectionhdr;
 
+#ifndef USE_RAWDEVICE
+#ifndef FIRMLOAD_DISABLE
 FIL firm_fil;
+#endif
+#endif
 
 void sha256hw_calchash_codebin(u32 *outhash, u32 *buf, u32 buf_wordsize, u32 *loadaddr, u32 *footertype)
 {
@@ -122,6 +150,7 @@ s32 verify_binarymemrange(u32 loadaddr, u32 binsize)
 	return ret;
 }
 
+#ifndef BINLOAD_DISABLE
 s32 load_binary(TCHAR *path, s32 *errortable, u32 **loadaddrptr)
 {
 	FRESULT res;
@@ -252,6 +281,7 @@ s32 load_binary(TCHAR *path, s32 *errortable, u32 **loadaddrptr)
 
 	return ret;
 }
+#endif
 
 #ifndef FIRMLOAD_DISABLE
 s32 load_firm(s32 *errorptr, read_funcptr read_data, u32 basesector, u32 maxsectors, u32 *arm9_entrypoint, u32 *arm11_entrypoint)
@@ -406,12 +436,19 @@ s32 load_firm(s32 *errorptr, read_funcptr read_data, u32 basesector, u32 maxsect
 	return 0;
 }
 
+#ifndef USE_RAWDEVICE
 s32 read_firm_data(u32 sector, u32 numsectors, u32 *out)
 {
 	FRESULT res;
 	UINT totalread=0;
 
 	s32 ret = 0;
+
+	res = f_lseek(&firm_fil, sector<<9);
+	if(res!=FR_OK)
+	{
+		return res;
+	}
 
 	res = f_read(&firm_fil, out, numsectors<<9, &totalread);
 
@@ -426,9 +463,11 @@ s32 read_firm_data(u32 sector, u32 numsectors, u32 *out)
 
 	return ret;
 }
+#endif
 
 s32 launch_firm(s32 *errorptr, u32 *arm9_entrypoint, u32 *arm11_entrypoint, TCHAR *path)
 {
+	#ifndef USE_RAWDEVICE
 	FRESULT res;
 	DWORD filesize=0;
 
@@ -453,9 +492,13 @@ s32 launch_firm(s32 *errorptr, u32 *arm9_entrypoint, u32 *arm11_entrypoint, TCHA
 	f_close(&firm_fil);
 
 	return ret;
+	#else
+	return load_firm(&errorptr[0x40>>2], unprotboot9_sdmmc_readrawsectors, RAWDEVICE_STARTSECTOR, RAWDEVICE_NUMSECTORS, arm9_entrypoint, arm11_entrypoint);
+	#endif
 }
 #endif
 
+#ifndef USE_RAWDEVICE
 void wchar2tchar(wchar_t *in, TCHAR *out, u32 outsize)
 {
 	u32 pos;
@@ -469,19 +512,27 @@ void wchar2tchar(wchar_t *in, TCHAR *out, u32 outsize)
 		outsize--;
 	}
 }
+#endif
 
 s32 load_binaries(u32 **loadaddr9, u32 *firmentrypoint9, u32 *firmentrypoint11)
 {
 	s32 ret;
 	s32 *errortable = (s32*)0x01ffcf00;
-	
+
+	#ifndef USE_RAWDEVICE
 	FRESULT res;
 	FATFS fs;
+	#endif
+
+	unprotboot9_sdmmc_deviceid deviceid = unprotboot9_sdmmc_deviceid_sd;
 
 	u32 is_new3ds = 0;
 	u32 pos;
 	u32 *firmlaunch_params = (u32*)0x20000000;
+
+	#ifndef BINLOAD_DISABLE
 	u32 *ptr;
+	#endif
 
 	TCHAR tmpstr[32];
 
@@ -499,20 +550,36 @@ s32 load_binaries(u32 **loadaddr9, u32 *firmentrypoint9, u32 *firmentrypoint11)
 	errortable[0] = (u32)ret;
 	if(ret)return ret;
 
-	ret = unprotboot9_sdmmc_initdevice(unprotboot9_sdmmc_deviceid_sd);
+	#ifdef USEDEVICE_NAND
+	deviceid = unprotboot9_sdmmc_deviceid_nand;
+	#endif
+
+	ret = unprotboot9_sdmmc_initdevice(deviceid);
 	errortable[1] = (u32)ret;
 	if(ret)return ret;
 
 	tmpstr[0] = 0;
+
+	#ifndef USE_RAWDEVICE
 	res = f_mount(&fs, tmpstr, 1);//Mount the FS.
 	errortable[2] = res;
 	if(res!=FR_OK)return res;
+	#endif
 
 	#ifndef BINLOAD_DISABLE
+	#ifndef USE_RAWDEVICE
 	wchar2tchar(ARM9BIN_FILEPATH, tmpstr, 32);
+	#endif
 
 	ret = load_binary(tmpstr, &errortable[4], loadaddr9);//Load the arm9 binary.
-	if(ret)return ret;
+	if(ret)
+	{
+		#ifndef USE_RAWDEVICE
+		tmpstr[0] = 0;
+		f_mount(NULL, tmpstr, 1);
+		#endif
+		return ret;
+	}
 
 	ptr = *loadaddr9;
 	if(ptr[1] == 0x4d415250)//Check for the PRAM magicnum @ loaded-bin+4.
@@ -523,20 +590,31 @@ s32 load_binaries(u32 **loadaddr9, u32 *firmentrypoint9, u32 *firmentrypoint11)
 	#endif
 
 	#ifndef FIRMLOAD_DISABLE
+	#ifndef USE_RAWDEVICE
 	wchar2tchar(FIRM_FILEPATH, tmpstr, 32);
+	#endif
 
 	ret = launch_firm(&errortable[0x40>>2], firmentrypoint9, firmentrypoint11, tmpstr);
-	if(ret)return ret;
+	if(ret)
+	{
+		#ifndef USE_RAWDEVICE
+		tmpstr[0] = 0;
+		f_mount(NULL, tmpstr, 1);
+		#endif
+		return ret;
+	}
 
 	#ifdef BINLOAD_DISABLE
-	*loadaddr9 = firmentrypoint9;
+	*loadaddr9 = (u32*)*firmentrypoint9;
 	#endif
 	#endif
 
+	#ifndef USE_RAWDEVICE
 	tmpstr[0] = 0;
 	res = f_mount(NULL, tmpstr, 1);//Unmount
 	errortable[3] = res;
 	if(res!=FR_OK)return res;
+	#endif
 
 	return 0;
 }
@@ -558,7 +636,9 @@ s32 main_()
 	if(ret)
 	{
 		#ifndef DISABLE_ARM11
+		#ifndef DISABLE_ARM11ABORT
 		arm11boot_ptr[0] = 0x54524241;//Tell the ARM11 to abort FIRM-boot, since an error occured.
+		#endif
 		#endif
 		return ret;
 	}

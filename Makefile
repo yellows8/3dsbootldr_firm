@@ -18,8 +18,8 @@ include $(DEVKITARM)/3ds_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	3dsbootldr_firm
 BUILD		:=	build
-SOURCES		:=	source source/ff source/ff/option_unicode
-INCLUDES	:=	source source/ff source/ff/option
+SOURCES		:=	source
+INCLUDES	:=	source
 DATA		:=	
 
 #---------------------------------------------------------------------------------
@@ -53,6 +53,29 @@ endif
 
 ifneq ($(strip $(DISABLE_ARM11)),)
 	DEFINES	:=	$(DEFINES) -DDISABLE_ARM11
+endif
+
+ifneq ($(strip $(DISABLE_ARM11ABORT)),)
+	DEFINES	:=	$(DEFINES) -DDISABLE_ARM11ABORT
+endif
+
+ifneq ($(strip $(USE_RAWDEVICE)),)
+	DEFINES	:=	$(DEFINES) -DUSE_RAWDEVICE
+else
+	SOURCES	:=	$(SOURCES) source/ff source/ff/option_unicode
+	INCLUDES	:=	$(INCLUDES) source/ff source/ff/option
+endif
+
+ifneq ($(strip $(USEDEVICE_NAND)),)
+	DEFINES	:=	$(DEFINES) -DUSEDEVICE_NAND
+endif
+
+ifneq ($(strip $(RAWDEVICE_STARTSECTOR)),)
+	DEFINES	:=	$(DEFINES) -DRAWDEVICE_STARTSECTOR=$(RAWDEVICE_STARTSECTOR)
+endif
+
+ifneq ($(strip $(RAWDEVICE_NUMSECTORS)),)
+	DEFINES	:=	$(DEFINES) -DRAWDEVICE_NUMSECTORS=$(RAWDEVICE_NUMSECTORS)
 endif
 
 ARCH	:=	-marm -fpie

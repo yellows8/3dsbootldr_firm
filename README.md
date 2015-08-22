@@ -4,7 +4,7 @@ The arm9bin starts with an u32 for the load-address, the rest of the binary is l
 
 See also the build_hashedbin.sh script, for building hashed binaries for this. "build_hashedbin.sh <inputbin> <outputbin>"
 
-Prior to jumping to the arm9bin, it will handle booting the ARM11. This requires running the built arm11bin on the ARM11, by the loader which loaded this codebase.
+Prior to jumping to the arm9bin, it will handle booting the ARM11. This requires running the built arm11bin on the ARM11, by the loader which loaded this codebase. This isn't actually needed if code similar to the arm11bin is already running on the ARM11.
 
 The FIRM section hashes are verified, however the FIRM header signature is not verified.
 
@@ -18,4 +18,9 @@ The FIRM section hashes are verified, however the FIRM header signature is not v
 * "BINLOAD_DISABLE=1" Disable loading the arm9bin. FIRMLOAD_DISABLE and BINLOAD_DISABLE must not be used at the same time.
 * "DISABLE_BINVERIFY=1" Disable using/verifying the SHA256 hash in the arm9bin(see above), with this the additional filesize requirement is disabled too.
 * "DISABLE_ARM11=1" Disable the code for booting the ARM11, from the arm9-code.
+* "DISABLE_ARM11ABORT=1" Disable sending the abort signal to the ARM11 when errors occur.
+* "USE_RAWDEVICE=1" Load FIRM from the raw sectors of the device(default is SD), instead of using FAT(this also disables building with libff). When using this option, BINLOAD_DISABLE, RAWDEVICE_STARTSECTOR, and RAWDEVICE_NUMSECTORS must be specified as well.
+* "USEDEVICE_NAND=1" When USE_RAWDEVICE is specified, use NAND instead of SD.
+* "RAWDEVICE_STARTSECTOR={val}" When USE_RAWDEVICE is specified, this is the start sector from which to start for FIRM.
+* "RAWDEVICE_NUMSECTORS={val}" When USE_RAWDEVICE is specified, this is the total number of sectors which can contain the FIRM relative to RAWDEVICE_STARTSECTOR: the entire FIRM must be contained within this range.
 
