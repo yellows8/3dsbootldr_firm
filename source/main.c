@@ -528,7 +528,10 @@ s32 load_binaries(u32 **loadaddr9, u32 *firmentrypoint9, u32 *firmentrypoint11)
 
 	u32 is_new3ds = 0;
 	u32 pos;
+
+	#ifdef ENABLE_CLEAR_FIRMLAUNCHPARAMS
 	u32 *firmlaunch_params = (u32*)0x20000000;
+	#endif
 
 	#ifndef BINLOAD_DISABLE
 	u32 *ptr;
@@ -544,7 +547,9 @@ s32 load_binaries(u32 **loadaddr9, u32 *firmentrypoint9, u32 *firmentrypoint11)
 	if(*((u32*)0x10000FFC) != 1)is_new3ds = 1;
 	is_new3ds<<= 30;
 
+	#ifdef ENABLE_CLEAR_FIRMLAUNCHPARAMS
 	for(pos=0; pos<(0x1000>>2); pos++)firmlaunch_params[pos] = 0;//Clear the FIRM-launch params in FCRAM.
+	#endif
 
 	ret = unprotboot9_sdmmc_initialize();
 	errortable[0] = (u32)ret;
