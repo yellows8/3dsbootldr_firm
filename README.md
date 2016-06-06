@@ -1,8 +1,10 @@
 This is a bootloader for loading an arm9bin from SD, and for loading FIRM. The default SD filepaths for those are: "/3dshax_arm9.bin" and "/firm.bin".  
 
+This uses code based on code from the following: https://github.com/yellows8/bootldr9_rawdevice https://github.com/yellows8/3dsbootldr_fatfs
+
 The arm9bin starts with an u32 for the load-address, the rest of the binary is loaded to this address. See main.c for the blacklisted memory ranges(MPU is disabled while this loader is running and when jumping to the arm9bin). The filesize must be at least 0x8-bytes, and the filesize must be 4-byte aligned. When DISABLE_BINVERIFY isn't used, the filesize must be at least 0x2c-bytes: the last 0x24-bytes are a footer. The first u32 in that footer is the footertype, this must match little-endian value 0x60788d1e for SHA256. The following data in the footer is a SHA256 hash over the rest of the file(this footer is loaded into memory seperate from the loadaddr).
 
-See also the build_hashedbin.sh script, for building hashed binaries for this. "build_hashedbin.sh <inputbin> <outputbin>"
+See also the build_hashedbin.sh script, for building hashed binaries for this(this is slightly different from the 3dsbootldr_fatfs script). "build_hashedbin.sh {inputbin} {outputbin}"
 
 Prior to jumping to the arm9bin, it will handle booting the ARM11. This requires running the built arm11bin on the ARM11, by the loader which loaded this codebase. This isn't actually needed if code similar to the arm11bin is already running on the ARM11.
 
